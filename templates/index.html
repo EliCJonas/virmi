@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virmi - VirusTotal Frontend</title>
+    <link rel="icon" href="/static/favicon.png">
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+        h1 { margin-bottom: 4px; }
+        input[type="text"] { width: 100%; padding: 10px; font-size: 16px; font-family: monospace; box-sizing: border-box; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 8px; }
+        #results { margin-top: 20px; }
+        .stat { display: inline-block; padding: 6px 12px; margin: 4px; border-radius: 4px; color: white; }
+        .malicious { background: #d32f2f; }
+        .suspicious { background: #f57c00; }
+        .undetected { background: #388e3c; }
+        .harmless { background: #1976d2; }
+        .error { color: #d32f2f; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <center><img src="/static/favicon.png" alt="Virmi Logo" width="100"><br>
+        <h1>Virmi</h1>
+        <h2>Version 1.0</h2>
+    <p>Look up a file hash, upload a file, or check a URL on VirusTotal</p>
+
+    <h2>Hash Lookup</h2>
+    <form id="scan-form">
+        <input type="text" id="hash" placeholder="Enter MD5, SHA-1, or SHA-256 hash" required>
+        <button type="submit">Scan</button>
+    </form>
+
+    <h2>URL Check</h2>
+    <form id="url-form">
+        <input type="text" id="url" placeholder="Enter URL (e.g. https://example.com)" required>
+        <button type="submit">Check URL</button>
+    </form>
+
+    <h2>Upload File</h2>
+    <form id="upload-form">
+        <input type="file" id="file" required>
+        <button type="submit">Upload & Scan</button>
+    </form>
+
+    <div id="results"></div></center>
+
+    <script>
+        document.getElementById("scan-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const hash = document.getElementById("hash").value.trim();
+            const results = document.getElementById("results");
+            results.innerHTML = "Scanning...";
+
+            const form = new FormData();
+            form.append("hash", hash);
+
+            const res = await fetch("/scan", { method: "POST", body: form });
+            const data = await res.json();
+
+            if (data.error) {
+                results.innerHTML = `<p class="error">${data.error}</p>`;
+                return;
+            }
+
+            const s = data.stats;
+            results.innerHTML = `
+                <h3>${data.name}</h3>
+                <span class="stat malicious">Malicious: ${s.malicious}</span>
+                <span class="stat suspicious">Suspicious: ${s.suspicious}</span>
+                <span class="stat undetected">Undetected: ${s.undetected}</span>
+                <span class="stat harmless">Harmless: ${s.harmless}</span>
+            `;
+        });
+
+        document.getElementById("url-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const url = document.getElementById("url").value.trim();
+            const results = document.getElementById("results");
+            results.innerHTML = "Checking URL...";
+
+            const form = new FormData();
+            form.append("url", url);
+
+            const res = await fetch("/url", { method: "POST", body: form });
+            const data = await res.json();
+
+            if (data.error) {
+                results.innerHTML = `<p class="error">${data.error}</p>`;
+                return;
+            }
+
+            const s = data.stats;
+            results.innerHTML = `
+                <h3>${data.url}</h3>
+                <span class="stat malicious">Malicious: ${s.malicious}</span>
+                <span class="stat suspicious">Suspicious: ${s.suspicious}</span>
+                <span class="stat undetected">Undetected: ${s.undetected}</span>
+                <span class="stat harmless">Harmless: ${s.harmless}</span>
+            `;
+        });
+
+        document.getElementById("upload-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById("file");
+            const results = document.getElementById("results");
+            results.innerHTML = "Uploading: 0%";
+
+            const form = new FormData();
+            form.append("file", fileInput.files[0]);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload");
+
+            xhr.upload.addEventListener("progress", (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    results.innerHTML = `Uploading: ${pct}%`;
+                    if (pct === 100) {
+                        results.innerHTML = "Upload complete. Waiting for analysis...";
+                    }
+                }
+            });
+
+            xhr.onload = () => {
+                const data = JSON.parse(xhr.responseText);
+                if (data.error) {
+                    results.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                const s = data.stats;
+                results.innerHTML = `
+                    <h3>Analysis: ${data.status}</h3>
+                    <span class="stat malicious">Malicious: ${s.malicious}</span>
+                    <span class="stat suspicious">Suspicious: ${s.suspicious}</span>
+                    <span class="stat undetected">Undetected: ${s.undetected}</span>
+                    <span class="stat harmless">Harmless: ${s.harmless}</span>
+                `;
+            };
+
+            xhr.onerror = () => {
+                results.innerHTML = `<p class="error">Upload failed</p>`;
+            };
+
+            xhr.send(form);
+        });
+    </script>
+</body>
+</html>
