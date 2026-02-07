@@ -1,6 +1,8 @@
 # virmi
 A simple self-hosted web frontend for the VirusTotal API
 
+[![4/6 LGTM Copilot | Vibescale](https://vibescale.github.io/badge/4.svg)](https://vibescale.github.io/#4)
+
 ## Features
 - Look up files by MD5, SHA-1, or SHA-256 hash
 - Upload files for scanning (with upload progress)
